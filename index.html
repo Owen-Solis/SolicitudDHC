@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solicitud de Empleo | DCH</title>
+
+    <!-- Iconos: pestaña, acceso directo en celular -->
+    <link rel="icon" href="favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="48x48" href="icons/favicon-48.png">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="theme-color" content="#231f20">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Solicitudes DCH">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body>
+
+    <header class="header">
+        <img src="img/dch_logo.png" alt="DCH Servicios Especializados">
+        <h1>Solicitud de Empleo</h1>
+    </header>
+
+    <main class="contenedor">
+
+        <!-- FORMULARIO (se construye desde js/app.js) -->
+        <section class="panel">
+            <div class="titulo-panel">
+                <h2>Datos del candidato</h2>
+                <p>La solicitud se actualiza mientras escribes.</p>
+            </div>
+
+            <form id="formulario" autocomplete="off" novalidate onsubmit="return false"></form>
+
+            <label class="check">
+                <input type="checkbox" id="mayusculas">
+                Todo en MAYÚSCULAS
+            </label>
+
+            <button type="button" class="btn-limpiar" id="btnLimpiar">Limpiar formulario</button>
+        </section>
+
+        <!-- VISTA PREVIA -->
+        <section class="panel preview-panel">
+            <div class="titulo-panel">
+                <h2>Vista previa</h2>
+                <p>Toca la imagen para ampliarla. Es exactamente lo que se descarga.</p>
+            </div>
+
+            <div class="tabs" role="tablist">
+                <button type="button" class="tab activo" data-pag="1" role="tab" aria-selected="true">Página 1 · Solicitud</button>
+                <button type="button" class="tab" data-pag="2" role="tab" aria-selected="false">Página 2 · Historial</button>
+            </div>
+
+            <canvas id="lienzo1" width="1700" height="2200" aria-label="Vista previa, página 1"></canvas>
+            <canvas id="lienzo2" width="1700" height="2200" aria-label="Vista previa, página 2" hidden></canvas>
+
+            <div class="acciones">
+                <button type="button" class="btn-descargar" id="btnPDF">Descargar PDF</button>
+                <button type="button" class="btn-secundario" id="btnImagen">Descargar imágenes</button>
+                <button type="button" class="btn-secundario" id="btnCompartir" hidden>Compartir</button>
+            </div>
+            <p class="aviso" id="aviso" role="status"></p>
+        </section>
+
+    </main>
+
+    <div id="zoom" class="zoom" hidden><img id="zoomImg" alt="Solicitud ampliada"></div>
+
+    <footer>Generador de solicitudes DCH</footer>
+
+    <script src="js/logo.js"></script>
+    <script src="js/plantilla.js"></script>
+    <script src="js/app.js"></script>
+
+</body>
+
+</html>
