@@ -11,7 +11,9 @@ const $ = (id) => document.getElementById(id);
 // tipo: text | date | tel | email | number | area | seg | herr
 // mitad: ocupa media fila · lista: sugerencias · mem: recuerda lo usado
 // ------------------------------------------
-const ENTERADO = ["Facebook", "Recomendación", "Volante", "Indeed", "OCC Mundial", "Computrabajo", "Módulo / Reclutador", "Otro"];
+// Listas desplegables (se pueden editar o agregar opciones aquí)
+const ENTERADO = ["Facebook", "Instagram", "LinkedIn", "OCC", "Indeed"];
+const PUESTOS = ["Ayudante general", "Almacenista", "Monta", "HP HS", "Técnico mantenimiento CNC", "Inspector de calidad"];
 const GRADOS = ["Primaria", "Secundaria", "Preparatoria / Bachillerato", "Carrera técnica", "Licenciatura (trunca)", "Licenciatura", "Maestría"];
 const CIVIL = ["Soltero(a)", "Casado(a)", "Unión libre", "Divorciado(a)", "Viudo(a)"];
 
@@ -39,8 +41,8 @@ const SECCIONES = [
         campos: [
             { k: "fecha", label: "Fecha", tipo: "date", mitad: true, req: false },
             { k: "entrevistador", label: "Entrevistador", mitad: true, req: true },
-            { k: "enterado", label: "¿Cómo se enteró de la vacante?", lista: ENTERADO, mem: true },
-            { k: "puesto", label: "Puesto solicitado", req: true, mem: true },
+            { k: "enterado", label: "¿Cómo se enteró de la vacante?", opciones: ENTERADO },
+            { k: "puesto", label: "Puesto solicitado", req: true, opciones: PUESTOS, otro: true, ph: "Escribe el puesto" },
             { k: "sueldo", label: "Sueldo mensual deseado", ph: "Ej. 12000", tipo: "text", inputmode: "decimal" },
         ],
     },
@@ -55,7 +57,7 @@ const SECCIONES = [
             { k: "telcasa", label: "Teléfono de casa", tipo: "tel", mitad: true },
             { k: "cel", label: "Celular", tipo: "tel", mitad: true },
             { k: "correo", label: "Correo", tipo: "email" },
-            { k: "civil", label: "Estado civil", lista: CIVIL },
+            { k: "civil", label: "Estado civil", sug: CIVIL },
         ],
     },
     {
@@ -73,7 +75,7 @@ const SECCIONES = [
         titulo: "Preparación académica / profesional",
         pag: 1,
         campos: [
-            { k: "grado", label: "Último grado de estudio", lista: GRADOS },
+            { k: "grado", label: "Último grado de estudio", sug: GRADOS },
             { k: "titulo", label: "Título recibido" },
         ],
     },
@@ -96,21 +98,6 @@ const SECCIONES = [
         campos: [{ k: "sinempleo", label: "Periodos sin empleo, fechas y ocupación", tipo: "area" }],
     },
     { titulo: "Firma del candidato", pag: 2, firma: true },
-    {
-        titulo: "Uso exclusivo de DCH",
-        pag: 2,
-        campos: [
-            { k: "temporal", label: "¿Ha desempeñado trabajo temporal?", tipo: "seg" },
-            { k: "tiempo", label: "¿Por cuánto tiempo?", mitad: true },
-            { k: "reingresos", label: "¿Ha tenido reingresos?", mitad: true },
-            { k: "paraquien", label: "¿Para quién trabajó?", mitad: true },
-            { k: "asignada", label: "¿A qué empresa se le asignó?", mitad: true },
-            { k: "pariente", label: "¿Trabaja algún pariente o conocido con nosotros?", tipo: "seg" },
-            { k: "quien", label: "¿Quién es?" },
-            { k: "sindicato", label: "¿Ha pertenecido a algún sindicato?", tipo: "seg" },
-            { k: "cual", label: "¿Cuál?" },
-        ],
-    },
 ];
 
 const HERRAMIENTAS = ["Patineta Hidráulica", "Montacargas", "Pulidor", "Soldadora", "Torno", "Fresadora"];
@@ -124,6 +111,7 @@ const E = { t: {}, herr: [], sig: [] };
 let pagina = 1;
 let edadManual = false;
 const el = {}; // inputs por clave
+const sel = {}; // listas desplegables por clave
 
 // ------------------------------------------
 // MEMORIA LOCAL
@@ -203,6 +191,29 @@ function crearCampo(c) {
         return wrap;
     }
 
+    if (c.sug) {
+        const g = crear("div", "chips sug");
+        c.sug.forEach((v) => {
+            const b = crear("button", "chip", v);
+            b.type = "button";
+            b.dataset.sug = c.k;
+            b.dataset.v = v;
+            g.appendChild(b);
+        });
+        wrap.appendChild(g);
+    }
+
+    if (c.opciones) {
+        const s = crear("select");
+        s.id = "f-" + c.k;
+        s.dataset.sel = c.k;
+        s.appendChild(new Option("Selecciona una opción", ""));
+        c.opciones.forEach((o) => s.appendChild(new Option(o, o)));
+        if (c.otro) s.appendChild(new Option("Otro", "__otro"));
+        wrap.appendChild(s);
+        sel[c.k] = s;
+    }
+
     let inp;
     if (c.tipo === "area") {
         inp = crear("textarea");
@@ -216,7 +227,8 @@ function crearCampo(c) {
             inp.max = 99;
         }
     }
-    inp.id = "f-" + c.k;
+    inp.id = (c.opciones ? "o-" : "f-") + c.k;
+    if (c.opciones) inp.hidden = true; // solo se muestra al elegir "Otro"
     inp.dataset.k = c.k;
     if (c.ph) inp.placeholder = c.ph;
     if (c.lista || c.mem) {
@@ -440,9 +452,10 @@ document.addEventListener("keydown", (e) => {
 function poner(k, v) {
     E.t[k] = v;
     if (el[k]) el[k].value = v;
+    if (typeof marcarSug === "function") marcarSug();
 }
 
-$("formulario").addEventListener("input", (e) => {
+function sincronizar(e) {
     const k = e.target.dataset && e.target.dataset.k;
     if (!k || e.target.tagName === "DIV") return;
     e.target.classList.remove("error");
@@ -453,8 +466,36 @@ $("formulario").addEventListener("input", (e) => {
         if (!edadManual) poner("edad", calcularEdad(E.t.fnac));
     }
     if (k === "entrevistador") guardar("dch_sol_entrevistador", e.target.value);
+    marcarSug();
     pintar();
-});
+}
+// "change" también: en el celular, elegir una sugerencia de la lista solo lanza este evento
+$("formulario").addEventListener("input", sincronizar);
+$("formulario").addEventListener("change", sincronizar);
+
+// Lista desplegable: al elegir "Otro" aparece un cuadro para escribir
+function selCambio(e) {
+    const s = e.target;
+    const k = s.dataset && s.dataset.sel;
+    if (!k) return;
+    const otro = s.value === "__otro";
+    const inp = el[k];
+    inp.hidden = !otro;
+    if (otro) {
+        E.t[k] = inp.value;
+        inp.focus();
+    } else {
+        E.t[k] = s.value;
+        inp.value = "";
+    }
+    s.classList.remove("error");
+    pintar();
+}
+$("formulario").addEventListener("change", selCambio);
+
+function marcarSug() {
+    document.querySelectorAll("[data-sug]").forEach((b) => b.classList.toggle("activo", (E.t[b.dataset.sug] || "").trim() === b.dataset.v));
+}
 
 // Nombres: primera letra de cada palabra en mayúscula
 $("formulario").addEventListener("focusout", (e) => {
@@ -477,6 +518,13 @@ $("formulario").addEventListener("click", (e) => {
         const k = seg.dataset.k;
         E.t[k] = E.t[k] === b.dataset.v ? "" : b.dataset.v;
         marcarSeg();
+        pintar();
+        return;
+    }
+    if (b.dataset.sug) {
+        const k = b.dataset.sug;
+        poner(k, E.t[k] === b.dataset.v ? "" : b.dataset.v);
+        el[k].classList.remove("error");
         pintar();
         return;
     }
@@ -506,12 +554,18 @@ $("btnLimpiar").addEventListener("click", () => {
         el[k].value = "";
         el[k].classList.remove("error");
     });
+    Object.keys(sel).forEach((k) => {
+        sel[k].value = "";
+        sel[k].classList.remove("error");
+        el[k].hidden = true;
+    });
     E.t = {};
     E.herr = [];
     E.sig = [];
     edadManual = false;
     document.querySelectorAll(".chip").forEach((c) => c.classList.remove("activo"));
     marcarSeg();
+    marcarSug();
     poner("fecha", hoyISO());
     poner("entrevistador", entrev);
     pintarPad();
@@ -532,9 +586,10 @@ function avisar(texto) {
 function validar() {
     const req = TODOS.filter((c) => c.req);
     const faltan = req.filter((c) => !(E.t[c.k] || "").trim());
-    req.forEach((c) => el[c.k].classList.toggle("error", faltan.includes(c)));
+    const visible = (k) => (sel[k] && el[k].hidden ? sel[k] : el[k]);
+    req.forEach((c) => visible(c.k).classList.toggle("error", faltan.includes(c)));
     if (faltan.length) {
-        el[faltan[0].k].focus();
+        visible(faltan[0].k).focus();
         avisar("Completa los campos marcados en rojo.");
         return false;
     }
