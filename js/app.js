@@ -13,7 +13,7 @@ const $ = (id) => document.getElementById(id);
 // ------------------------------------------
 // Listas desplegables (se pueden editar o agregar opciones aquí)
 const ENTERADO = ["Facebook", "Instagram", "LinkedIn", "OCC", "Indeed"];
-const PUESTOS = ["Ayudante general", "Almacenista", "Monta", "HP HS", "Técnico mantenimiento CNC", "Inspector de calidad"];
+const PUESTOS = ["Ayudante general", "Almacenista", "Montacargas HP", "Montacargas HS", "Técnico mantenimiento CNC", "Inspector de calidad"];
 const GRADOS = ["Primaria", "Secundaria", "Preparatoria / Bachillerato", "Carrera técnica", "Licenciatura (trunca)", "Licenciatura", "Maestría"];
 const CIVIL = ["Soltero(a)", "Casado(a)", "Unión libre", "Divorciado(a)", "Viudo(a)"];
 
