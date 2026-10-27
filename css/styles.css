@@ -522,3 +522,43 @@ footer {
         width: 100%;
     }
 }
+
+/* sugerencias de un toque sobre el campo */
+.chips.sug {
+    margin-bottom: 8px;
+}
+
+.chips.sug .chip {
+    flex: 0 1 auto;
+    padding: 9px 12px;
+}
+
+/* lista desplegable */
+.campo select {
+    width: 100%;
+    height: 46px;
+    padding: 0 12px;
+    border: 1px solid var(--borde);
+    border-radius: 8px;
+    font-size: 16px;
+    background: #fff;
+    outline: none;
+}
+
+.campo select:focus {
+    border-color: var(--azul);
+    box-shadow: 0 0 0 3px rgba(31, 139, 203, .15);
+}
+
+.campo select.error {
+    border-color: #d93025;
+    box-shadow: 0 0 0 3px rgba(217, 48, 37, .12);
+}
+
+.campo select + input {
+    margin-top: 8px;
+}
+
+.campo input[hidden] {
+    display: none;
+}
