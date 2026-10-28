@@ -12,6 +12,8 @@ const $ = (id) => document.getElementById(id);
 // mitad: ocupa media fila · lista: sugerencias · mem: recuerda lo usado
 // ------------------------------------------
 // Listas desplegables (se pueden editar o agregar opciones aquí)
+// Empresa a la que aplica: NO se imprime en la solicitud, solo sirve para nombrar el archivo
+const EMPRESAS = ["AMAZON", "NIDEC", "SANKO", "KN", "MELI"];
 const ENTERADO = ["Facebook", "Instagram", "LinkedIn", "OCC", "Indeed"];
 const PUESTOS = ["Ayudante general", "Almacenista", "Montacargas HP", "Montacargas HS", "Técnico mantenimiento CNC", "Inspector de calidad"];
 const GRADOS = ["Primaria", "Secundaria", "Preparatoria / Bachillerato", "Carrera técnica", "Licenciatura (trunca)", "Licenciatura", "Maestría"];
@@ -39,6 +41,7 @@ const SECCIONES = [
         titulo: "Datos de la solicitud",
         pag: 1,
         campos: [
+            { k: "empresaApl", label: "Empresa a la que aplica (no se imprime)", req: true, opciones: EMPRESAS },
             { k: "fecha", label: "Fecha", tipo: "date", mitad: true, req: false },
             { k: "entrevistador", label: "Entrevistador", mitad: true, req: true },
             { k: "enterado", label: "¿Cómo se enteró de la vacante?", opciones: ENTERADO },
@@ -98,6 +101,21 @@ const SECCIONES = [
         campos: [{ k: "sinempleo", label: "Periodos sin empleo, fechas y ocupación", tipo: "area" }],
     },
     { titulo: "Firma del candidato", pag: 2, firma: true },
+    {
+        titulo: "Uso exclusivo de DCH",
+        pag: 2,
+        campos: [
+            { k: "temporal", label: "¿Ha desempeñado trabajo temporal?", tipo: "seg" },
+            { k: "tiempo", label: "¿Por cuánto tiempo?", mitad: true },
+            { k: "reingresos", label: "¿Ha tenido reingresos?", mitad: true },
+            { k: "paraquien", label: "¿Para quién trabajó?", mitad: true },
+            { k: "asignada", label: "¿A qué empresa se le asignó?", mitad: true },
+            { k: "pariente", label: "¿Trabaja algún pariente o conocido con nosotros?", tipo: "seg" },
+            { k: "quien", label: "¿Quién es?" },
+            { k: "sindicato", label: "¿Ha pertenecido a algún sindicato?", tipo: "seg" },
+            { k: "cual", label: "¿Cuál?" },
+        ],
+    },
 ];
 
 const HERRAMIENTAS = ["Patineta Hidráulica", "Montacargas", "Pulidor", "Soldadora", "Torno", "Fresadora"];
@@ -111,7 +129,7 @@ const E = { t: {}, herr: [], sig: [] };
 let pagina = 1;
 let edadManual = false;
 const el = {}; // inputs por clave
-const sel = {}; // listas desplegables por clave
+const grp = {}; // grupos de botones de opción, por clave
 
 // ------------------------------------------
 // MEMORIA LOCAL
@@ -204,14 +222,18 @@ function crearCampo(c) {
     }
 
     if (c.opciones) {
-        const s = crear("select");
-        s.id = "f-" + c.k;
-        s.dataset.sel = c.k;
-        s.appendChild(new Option("Selecciona una opción", ""));
-        c.opciones.forEach((o) => s.appendChild(new Option(o, o)));
-        if (c.otro) s.appendChild(new Option("Otro", "__otro"));
-        wrap.appendChild(s);
-        sel[c.k] = s;
+        const g = crear("div", "chips opciones");
+        g.dataset.val = "";
+        [...c.opciones, ...(c.otro ? ["Otro"] : [])].forEach((o) => {
+            const b = crear("button", "chip", o);
+            b.type = "button";
+            b.dataset.opc = c.k;
+            b.dataset.v = o;
+            g.appendChild(b);
+        });
+        lab.removeAttribute("for");
+        wrap.appendChild(g);
+        grp[c.k] = g;
     }
 
     let inp;
@@ -473,25 +495,26 @@ function sincronizar(e) {
 $("formulario").addEventListener("input", sincronizar);
 $("formulario").addEventListener("change", sincronizar);
 
-// Lista desplegable: al elegir "Otro" aparece un cuadro para escribir
-function selCambio(e) {
-    const s = e.target;
-    const k = s.dataset && s.dataset.sel;
-    if (!k) return;
-    const otro = s.value === "__otro";
+// Botones de opción: al tocar "Otro" aparece un cuadro para escribir; tocar otra vez quita la selección
+function elegir(k, v) {
+    const g = grp[k];
+    const nuevo = g.dataset.val === v ? "" : v;
+    g.dataset.val = nuevo;
+    g.querySelectorAll("button").forEach((b) => b.classList.toggle("activo", b.dataset.v === nuevo));
     const inp = el[k];
+    const otro = nuevo === "Otro";
     inp.hidden = !otro;
     if (otro) {
         E.t[k] = inp.value;
         inp.focus();
     } else {
-        E.t[k] = s.value;
+        E.t[k] = nuevo;
         inp.value = "";
     }
-    s.classList.remove("error");
+    g.classList.remove("error");
+    if (k === "empresaApl") guardar("dch_sol_empresa", E.t[k]);
     pintar();
 }
-$("formulario").addEventListener("change", selCambio);
 
 function marcarSug() {
     document.querySelectorAll("[data-sug]").forEach((b) => b.classList.toggle("activo", (E.t[b.dataset.sug] || "").trim() === b.dataset.v));
@@ -519,6 +542,10 @@ $("formulario").addEventListener("click", (e) => {
         E.t[k] = E.t[k] === b.dataset.v ? "" : b.dataset.v;
         marcarSeg();
         pintar();
+        return;
+    }
+    if (b.dataset.opc) {
+        elegir(b.dataset.opc, b.dataset.v);
         return;
     }
     if (b.dataset.sug) {
@@ -550,13 +577,15 @@ $("mayusculas").addEventListener("change", () => {
 $("btnLimpiar").addEventListener("click", () => {
     if (!confirm("¿Borrar todo el formulario?")) return;
     const entrev = E.t.entrevistador || "";
+    const empresa = E.t.empresaApl || ""; // se queda igual, como el entrevistador
     Object.keys(el).forEach((k) => {
         el[k].value = "";
         el[k].classList.remove("error");
     });
-    Object.keys(sel).forEach((k) => {
-        sel[k].value = "";
-        sel[k].classList.remove("error");
+    Object.keys(grp).forEach((k) => {
+        grp[k].dataset.val = "";
+        grp[k].classList.remove("error");
+        grp[k].querySelectorAll("button").forEach((b) => b.classList.remove("activo"));
         el[k].hidden = true;
     });
     E.t = {};
@@ -568,6 +597,7 @@ $("btnLimpiar").addEventListener("click", () => {
     marcarSug();
     poner("fecha", hoyISO());
     poner("entrevistador", entrev);
+    if (empresa) elegir("empresaApl", empresa);
     pintarPad();
     avisar("");
     irAPagina(1);
@@ -586,10 +616,11 @@ function avisar(texto) {
 function validar() {
     const req = TODOS.filter((c) => c.req);
     const faltan = req.filter((c) => !(E.t[c.k] || "").trim());
-    const visible = (k) => (sel[k] && el[k].hidden ? sel[k] : el[k]);
+    const visible = (k) => (grp[k] && el[k].hidden ? grp[k] : el[k]);
     req.forEach((c) => visible(c.k).classList.toggle("error", faltan.includes(c)));
     if (faltan.length) {
-        visible(faltan[0].k).focus();
+        (visible(faltan[0].k).focus || (() => {})).call(visible(faltan[0].k));
+        visible(faltan[0].k).scrollIntoView({ block: "center", behavior: "smooth" });
         avisar("Completa los campos marcados en rojo.");
         return false;
     }
@@ -604,7 +635,10 @@ function nombreBase() {
         .replace(/[̀-ͯ]/g, "")
         .replace(/\s+/g, "-")
         .replace(/[^a-z0-9-]/g, "");
-    return `solicitud-${base || "candidato"}`;
+    const emp = (E.t.empresaApl || "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "");
+    return `solicitud-${base || "candidato"}${emp ? "-" + emp : ""}`;
 }
 
 function aBlob(canvas, tipo, calidad) {
@@ -757,6 +791,12 @@ function cargarFuentes() {
 construirFormulario();
 poner("fecha", hoyISO());
 poner("entrevistador", leer("dch_sol_entrevistador", ""));
+{
+    const emp = leer("dch_sol_empresa", "");
+    if (EMPRESAS.includes(emp)) {
+        elegir("empresaApl", emp);
+    }
+}
 $("mayusculas").checked = leer("dch_sol_mayusculas", false);
 marcarSeg();
 irAPagina(1);

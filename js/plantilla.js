@@ -138,15 +138,26 @@
         campo("sinempleo", "Periodos en los cuales ha permanecido sin empleo, proporcionar fechas y ocupación:", b2(40, 692, 947, 782), { multi: true }),
         { t: "parrafo", txt: TXT_PRIVACIDAD, x: 60, y: Ya(792), w: 1556, tam: 16, lh: 21, color: COL.texto, justificar: true },
         { t: "firma" },
-        { t: "linea", x1: 372 * sx2, x2: 612 * sx2, y: Yb(952) + 120 },
-        { t: "texto", txt: "Firma del candidato", x: 492 * sx2, y: Yb(973) + 120, tam: 27, peso: 600, color: COL.texto, align: "center" },
-        { t: "parrafo", txt: TXT_MANIFIESTO, x: 60, y: Yb(990) + 120, w: 1556, tam: 17, lh: 23, color: COL.texto, justificar: true }
+        { t: "linea", x1: 372 * sx2, x2: 612 * sx2, y: Yb(952) },
+        { t: "texto", txt: "Firma del candidato", x: 492 * sx2, y: Yb(973), tam: 27, peso: 600, color: COL.texto, align: "center" },
+        { t: "parrafo", txt: TXT_MANIFIESTO, x: 60, y: Yb(990), w: 1556, tam: 17, lh: 23, color: COL.texto, justificar: true },
+        { t: "texto", txt: "Para Uso Exclusivo de DCH Servicios Especializados y sus razones sociales", x: 495 * sx2, y: Yb(1040), ancho: 695 * sx2, peso: 800, color: COL.titulo, exacto: true, align: "center" },
+
+        { t: "siNo", k: "temporal", label: "¿Anteriormente ha desempeñado trabajo temporal?:", lx: 53 * sx2, cy: Yb(1069), siX: 497 * sx2, siBox: 532 * sx2, noX: 557 * sx2, noBox: 600 * sx2 },
+        campo("tiempo", "¿Por cuánto tiempo?", b2(622, 1050, 938, 1100, Yb)),
+        campo("paraquien", "¿Para quién trabajó?", b2(54, 1106, 316, 1156, Yb)),
+        campo("asignada", "¿A qué empresa se le asignó?", b2(322, 1106, 616, 1156, Yb)),
+        campo("reingresos", "¿Ha tenido reingresos?", b2(622, 1106, 938, 1156, Yb)),
+        { t: "siNo", k: "pariente", label: "¿Trabaja algún pariente o conocido con nosotros?:", lx: 53 * sx2, cy: Yb(1180), siX: 483 * sx2, siBox: 518 * sx2, noX: 542 * sx2, noBox: 585 * sx2 },
+        campo("quien", "¿Quién es?", b2(622, 1164, 938, 1214, Yb)),
+        { t: "siNo", k: "sindicato", label: "¿Ha pertenecido a algún sindicato?:", lx: 53 * sx2, cy: Yb(1238), siX: 363 * sx2, siBox: 395 * sx2, noX: 418 * sx2, noBox: 461 * sx2 },
+        campo("cual", "¿Cuál?", b2(502, 1220, 818, 1270, Yb))
     );
 
     const PAGINAS = { 1: P1, 2: P2 };
 
     // Zona donde se imprime la firma (pág. 2), encima de la línea
-    const FIRMA = { x: 595, y: 1606, w: 490, h: 143 };
+    const FIRMA = { x: 595, y: 1486, w: 490, h: 143 };
 
     // ------------------------------------------
     // UTILIDADES DE DIBUJO

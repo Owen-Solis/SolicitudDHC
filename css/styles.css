@@ -562,3 +562,22 @@ footer {
 .campo input[hidden] {
     display: none;
 }
+
+/* botones de opción (empresa, cómo se enteró, puesto) */
+.chips.opciones {
+    margin-bottom: 8px;
+}
+
+.chips.opciones .chip {
+    flex: 1 1 calc(50% - 8px);
+}
+
+.chips.error {
+    outline: 2px solid #d93025;
+    outline-offset: 3px;
+    border-radius: 10px;
+}
+
+.campo input[hidden] {
+    display: none;
+}
