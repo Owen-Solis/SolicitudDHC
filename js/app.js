@@ -16,6 +16,28 @@ const $ = (id) => document.getElementById(id);
 const EMPRESAS = ["AMAZON", "NIDEC", "SANKO", "KN", "MELI"];
 const ENTERADO = ["Facebook", "Instagram", "LinkedIn", "OCC", "Indeed"];
 const PUESTOS = ["Ayudante general", "Almacenista", "Montacargas HP", "Montacargas HS", "Técnico mantenimiento CNC", "Inspector de calidad"];
+// Expediente MELI: el orden es el que pide el cliente (así queda en el PDF).
+// req: true  -> si no se sube, esa hoja sale con la marca "PENDIENTE DE ENTREGA"
+// req: false -> si no se sube, simplemente no se incluye
+// k: "SOLICITUD" -> aquí van las 2 páginas de la solicitud de empleo (se agregan solas)
+const EXPEDIENTE_MELI = [
+    { k: "acta", label: "Acta de nacimiento", req: true },
+    { k: "csf", label: "Constancia de situación fiscal", nota: "actualizada 2026", req: true },
+    { k: "rfc", label: "Validación RFC", req: true },
+    { k: "curp", label: "CURP", req: true },
+    { k: "nss", label: "Número de asignación social (NSS)", req: true },
+    { k: "ine", label: "INE", req: true },
+    { k: "edocta", label: "Estado de cuenta", req: true },
+    { k: "cert", label: "Certificado de estudios", req: true },
+    { k: "domicilio", label: "Comprobante de domicilio", req: true },
+    { k: "infonavit", label: "Infonavit o Fonacot", req: false },
+    { k: "SOLICITUD", label: "Solicitud de empleo" },
+    { k: "carta", label: "Carta bienvenida MELI", req: false },
+];
+const DOCS = {}; // archivos subidos por documento: { clave: [File, ...] }
+const esMeli = () => E.t.empresaApl === "MELI";
+
+const ESTADOS = ["Nuevo León", "Aguascalientes", "Baja California", "Baja California Sur", "Campeche", "Chiapas", "Chihuahua", "Ciudad de México", "Coahuila", "Colima", "Durango", "Estado de México", "Guanajuato", "Guerrero", "Hidalgo", "Jalisco", "Michoacán", "Morelos", "Nayarit", "Oaxaca", "Puebla", "Querétaro", "Quintana Roo", "San Luis Potosí", "Sinaloa", "Sonora", "Tabasco", "Tamaulipas", "Tlaxcala", "Veracruz", "Yucatán", "Zacatecas"];
 const GRADOS = ["Primaria", "Secundaria", "Preparatoria / Bachillerato", "Carrera técnica", "Licenciatura (trunca)", "Licenciatura", "Maestría"];
 const CIVIL = ["Soltero(a)", "Casado(a)", "Unión libre", "Divorciado(a)", "Viudo(a)"];
 
@@ -28,8 +50,8 @@ const bloqueEmpleo = (n, titulo, abierta) => ({
         { k: "emp" + n, label: "Empresa" },
         { k: "tel" + n, label: "Teléfono", tipo: "tel", mitad: true },
         { k: "jefe" + n, label: "Jefe inmediato", mitad: true },
-        { k: "ing" + n, label: "Fecha de ingreso", ph: "Ej. 03/2022", mitad: true },
-        { k: "baj" + n, label: "Fecha de baja", ph: "Ej. 08/2024", mitad: true },
+        { k: "ing" + n, label: "Fecha de ingreso", ph: "MM/AAAA", mes: true, mitad: true },
+        { k: "baj" + n, label: "Fecha de baja", ph: "MM/AAAA", mes: true, mitad: true },
         { k: "pue" + n, label: "Último puesto", mitad: true },
         { k: "area" + n, label: "Área", mitad: true },
         { k: "mot" + n, label: "Motivo de separación" },
@@ -41,7 +63,7 @@ const SECCIONES = [
         titulo: "Datos de la solicitud",
         pag: 1,
         campos: [
-            { k: "empresaApl", label: "Empresa a la que aplica (no se imprime)", req: true, opciones: EMPRESAS },
+            { k: "empresaApl", label: "Empresa a la que aplica", req: true, opciones: EMPRESAS },
             { k: "fecha", label: "Fecha", tipo: "date", mitad: true, req: false },
             { k: "entrevistador", label: "Entrevistador", mitad: true, req: true },
             { k: "enterado", label: "¿Cómo se enteró de la vacante?", opciones: ENTERADO },
@@ -56,7 +78,7 @@ const SECCIONES = [
             { k: "nombre", label: "Nombre completo", req: true },
             { k: "fnac", label: "Fecha de nacimiento", tipo: "date", mitad: true },
             { k: "edad", label: "Edad", tipo: "number", mitad: true, ph: "Se calcula sola" },
-            { k: "lnac", label: "Lugar de nacimiento", mem: true },
+            { k: "lnac", label: "Lugar de nacimiento", desplegable: ESTADOS, otro: true, ph: "Escribe el lugar de nacimiento" },
             { k: "telcasa", label: "Teléfono de casa", tipo: "tel", mitad: true },
             { k: "cel", label: "Celular", tipo: "tel", mitad: true },
             { k: "correo", label: "Correo", tipo: "email" },
@@ -67,9 +89,9 @@ const SECCIONES = [
         titulo: "Dirección",
         pag: 1,
         campos: [
-            { k: "calle", label: "Calle y número" },
-            { k: "colonia", label: "Colonia", mem: true, mitad: true },
-            { k: "municipio", label: "Municipio", mem: true, mitad: true },
+            { k: "calle", label: "Calle y número", direccion: true, ph: "Escribe la calle y elige una sugerencia" },
+            { k: "colonia", label: "Colonia", mitad: true },
+            { k: "municipio", label: "Municipio", mitad: true },
             { k: "infonavit", label: "¿Tiene crédito Infonavit?", tipo: "seg" },
             { k: "credito", label: "Número de crédito", ph: "Solo si tiene crédito" },
         ],
@@ -130,6 +152,7 @@ let pagina = 1;
 let edadManual = false;
 const el = {}; // inputs por clave
 const grp = {}; // grupos de botones de opción, por clave
+const lst = {}; // listas desplegables (estados), por clave
 
 // ------------------------------------------
 // MEMORIA LOCAL
@@ -176,10 +199,131 @@ function crear(tag, clase, html) {
     return n;
 }
 
+// ---------- Fecha MM/AAAA: la diagonal se pone sola y también se puede elegir con el calendario ----------
+function formatoMes(valor, borrando) {
+    if (!/^[\d/]*$/.test(valor)) return valor; // si escribe texto (ej. "Actual"), se respeta
+    let d = valor.replace(/\D/g, "").slice(0, 6);
+    if (d.length === 1 && Number(d) > 1) d = "0" + d; // 9 -> 09
+    if (d.length >= 2 && Number(d.slice(0, 2)) > 12) d = "0" + d.slice(0, 1) + d.slice(1); // 20 -> 02/0
+    if (d.length < 2) return d;
+    if (d.length === 2) return borrando ? d : d + "/";
+    return d.slice(0, 2) + "/" + d.slice(2);
+}
+
+function activarMes(wrap, inp) {
+    inp.inputMode = "numeric";
+    inp.maxLength = 7;
+    inp.addEventListener("input", (e) => {
+        inp.value = formatoMes(inp.value, e.inputType && e.inputType.startsWith("delete"));
+    });
+    const caja = crear("div", "mes-wrap");
+    caja.appendChild(inp);
+    const probe = document.createElement("input");
+    probe.type = "month";
+    if (probe.type === "month" && inp.dataset.k !== undefined) {
+        const pick = crear("input");
+        pick.type = "month";
+        pick.tabIndex = -1;
+        pick.className = "mes-pick";
+        pick.addEventListener("change", () => {
+            if (!pick.value) return;
+            const [a, m] = pick.value.split("-");
+            inp.value = `${m}/${a}`;
+            inp.dispatchEvent(new Event("input", { bubbles: true }));
+        });
+        const b = crear("button", "mes-btn", "📅");
+        b.type = "button";
+        b.setAttribute("aria-label", "Elegir mes y año");
+        b.addEventListener("click", () => {
+            try {
+                pick.showPicker();
+            } catch (e) {
+                pick.focus();
+            }
+        });
+        caja.appendChild(pick);
+        caja.appendChild(b);
+    }
+    wrap.appendChild(caja);
+}
+
+// ---------- Dirección: sugerencias mientras escribe la calle (OpenStreetMap / Nominatim) ----------
+function activarDireccion(wrap, inp) {
+    wrap.classList.add("rel");
+    const caja = crear("div", "dir-sugs");
+    caja.hidden = true;
+    wrap.appendChild(caja);
+    wrap.appendChild(crear("p", "ayuda", "Al elegir una sugerencia se llenan solas la colonia y el municipio. Requiere internet."));
+    let timer;
+    let ctl;
+    const cerrar = () => {
+        caja.hidden = true;
+        caja.innerHTML = "";
+    };
+    const msg = (t) => {
+        caja.hidden = false;
+        caja.innerHTML = "";
+        caja.appendChild(crear("div", "dir-msg", t));
+    };
+    const limpia = (t) => (t || "").replace(/^(Municipio de|Colonia)\s+/i, "").trim();
+
+    function aplicar(r, q) {
+        const a = r.address || {};
+        const road = a.road || a.pedestrian || a.residential || "";
+        let num = a.house_number || "";
+        if (!num) {
+            const m = q.match(/(\d+\s?[A-Za-z]?)\s*$/);
+            if (m && !road.endsWith(m[1])) num = m[1].trim();
+        }
+        poner("calle", road ? (road + " " + num).trim() : q);
+        poner("colonia", limpia(a.suburb || a.neighbourhood || a.quarter || a.city_district || ""));
+        poner("municipio", limpia(a.municipality || a.city || a.town || a.village || a.county || ""));
+        cerrar();
+        pintar();
+    }
+
+    async function buscar(q) {
+        if (ctl) ctl.abort();
+        ctl = new AbortController();
+        msg("Buscando…");
+        try {
+            const url =
+                "https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=6&countrycodes=mx&accept-language=es" +
+                "&viewbox=-100.75,26.1,-99.85,25.3&q=" + encodeURIComponent(q);
+            const resp = await fetch(url, { signal: ctl.signal });
+            const datos = (await resp.json()).filter((r) => r.address && (r.address.road || r.address.pedestrian || r.address.residential));
+            if (!datos.length) return msg("Sin coincidencias. Escribe la dirección a mano.");
+            caja.innerHTML = "";
+            datos.forEach((r) => {
+                const a = r.address;
+                const partes = [a.road || a.pedestrian || a.residential, a.suburb || a.neighbourhood || a.city_district, a.municipality || a.city || a.town, a.state].filter(Boolean);
+                const b = crear("button", "dir-sug", partes.join(", "));
+                b.type = "button";
+                b.addEventListener("mousedown", (e) => e.preventDefault()); // que no se cierre antes de elegir
+                b.addEventListener("click", () => aplicar(r, q));
+                caja.appendChild(b);
+            });
+        } catch (e) {
+            if (e.name !== "AbortError") msg("No se pudo buscar (¿sin internet?). Escribe la dirección a mano.");
+        }
+    }
+
+    inp.addEventListener("input", () => {
+        clearTimeout(timer);
+        const q = inp.value.trim();
+        if (q.length < 6) return cerrar();
+        timer = setTimeout(() => buscar(q), 700);
+    });
+    inp.addEventListener("blur", () => setTimeout(cerrar, 200));
+    inp.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") cerrar();
+    });
+}
+
 function crearCampo(c) {
     const wrap = crear("div", "campo" + (c.mitad ? " mitad" : ""));
     const lab = crear("label", "", c.label + (c.req ? "" : ""));
-    lab.htmlFor = "f-" + c.k;
+    lab.htmlFor = (c.desplegable ? "s-" : "f-") + c.k;
     wrap.appendChild(lab);
 
     if (c.tipo === "seg") {
@@ -236,6 +380,17 @@ function crearCampo(c) {
         grp[c.k] = g;
     }
 
+    if (c.desplegable) {
+        const sl = crear("select");
+        sl.id = "s-" + c.k;
+        sl.dataset.lst = c.k;
+        sl.appendChild(new Option("Selecciona una opción", ""));
+        c.desplegable.forEach((o) => sl.appendChild(new Option(o, o)));
+        if (c.otro) sl.appendChild(new Option("Otro", "__otro"));
+        wrap.appendChild(sl);
+        lst[c.k] = sl;
+    }
+
     let inp;
     if (c.tipo === "area") {
         inp = crear("textarea");
@@ -249,8 +404,8 @@ function crearCampo(c) {
             inp.max = 99;
         }
     }
-    inp.id = (c.opciones ? "o-" : "f-") + c.k;
-    if (c.opciones) inp.hidden = true; // solo se muestra al elegir "Otro"
+    inp.id = (c.opciones || c.desplegable ? "o-" : "f-") + c.k;
+    if (c.opciones || c.desplegable) inp.hidden = true; // solo se muestra al elegir "Otro"
     inp.dataset.k = c.k;
     if (c.ph) inp.placeholder = c.ph;
     if (c.lista || c.mem) {
@@ -259,7 +414,9 @@ function crearCampo(c) {
         dl.id = "dl-" + c.k;
         wrap.appendChild(dl);
     }
-    wrap.appendChild(inp);
+    if (c.mes) activarMes(wrap, inp);
+    else wrap.appendChild(inp);
+    if (c.direccion) activarDireccion(wrap, inp);
     el[c.k] = inp;
     return wrap;
 }
@@ -291,6 +448,107 @@ function construirFormulario() {
         form.appendChild(caja);
     });
     TODOS.forEach(llenarLista);
+    construirExpediente();
+}
+
+// ------------------------------------------
+// EXPEDIENTE MELI (solo aparece al elegir MELI)
+// ------------------------------------------
+function construirExpediente() {
+    const caja = crear("fieldset", "seccion expediente");
+    caja.id = "expediente";
+    caja.hidden = true;
+    caja.appendChild(crear("legend", "", "Expediente MELI"));
+    caja.appendChild(crear("p", "ayuda", "Sube cada documento (foto o PDF). El PDF final los junta en este orden y, si falta un documento obligatorio, esa hoja sale con la marca «PENDIENTE DE ENTREGA»."));
+    caja.appendChild(crear("p", "exp-resumen"));
+    const lista = crear("div", "exp-lista");
+    EXPEDIENTE_MELI.forEach((d, i) => {
+        const fila = crear("div", "doc");
+        fila.dataset.doc = d.k;
+        const sub = d.k === "SOLICITUD" ? "Se agrega automáticamente" : (d.req ? "Obligatorio" : "Opcional") + (d.nota ? " · " + d.nota : "");
+        fila.innerHTML = `<div class="doc-cab"><span class="num">${i + 1}</span><div class="doc-tit"><b>${d.label}</b><small>${sub}</small></div><span class="estado"></span></div>`;
+        if (d.k !== "SOLICITUD") {
+            fila.appendChild(crear("div", "doc-archivos"));
+            const lab = crear("label", "btn-subir", "Subir archivo");
+            const inp = crear("input");
+            inp.type = "file";
+            inp.accept = "image/*,application/pdf";
+            inp.multiple = true;
+            inp.hidden = true;
+            inp.dataset.subir = d.k;
+            lab.appendChild(inp);
+            fila.appendChild(lab);
+        }
+        lista.appendChild(fila);
+    });
+    caja.appendChild(lista);
+
+    caja.addEventListener("change", (e) => {
+        const k = e.target.dataset && e.target.dataset.subir;
+        if (!k) return;
+        DOCS[k] = [...(DOCS[k] || []), ...e.target.files];
+        e.target.value = "";
+        actualizarExpediente();
+    });
+    caja.addEventListener("click", (e) => {
+        const b = e.target.closest("[data-quitar]");
+        if (!b) return;
+        const k = b.dataset.quitar;
+        DOCS[k].splice(Number(b.dataset.i), 1);
+        actualizarExpediente();
+    });
+    $("formulario").appendChild(caja);
+}
+
+function actualizarExpediente() {
+    const caja = $("expediente");
+    caja.hidden = !esMeli();
+    if (!esMeli()) return;
+    let faltan = 0;
+    EXPEDIENTE_MELI.forEach((d) => {
+        const fila = caja.querySelector(`[data-doc="${d.k}"]`);
+        const est = fila.querySelector(".estado");
+        if (d.k === "SOLICITUD") {
+            est.textContent = "✔ Lista";
+            est.className = "estado ok";
+            return;
+        }
+        const files = DOCS[d.k] || [];
+        const cont = fila.querySelector(".doc-archivos");
+        cont.innerHTML = "";
+        files.forEach((f, i) => {
+            const it = crear("div", "archivo");
+            if (f.type.startsWith("image/")) {
+                const im = crear("img");
+                im.src = URL.createObjectURL(f);
+                im.onload = () => URL.revokeObjectURL(im.src);
+                it.appendChild(im);
+            } else {
+                it.appendChild(crear("span", "pdf", "PDF"));
+            }
+            it.appendChild(crear("span", "nom", f.name));
+            const q = crear("button", "quitar", "✕");
+            q.type = "button";
+            q.dataset.quitar = d.k;
+            q.dataset.i = i;
+            q.setAttribute("aria-label", "Quitar " + f.name);
+            it.appendChild(q);
+            cont.appendChild(it);
+        });
+        fila.querySelector(".btn-subir").firstChild.textContent = files.length ? "Agregar otro archivo" : "Subir archivo";
+        if (files.length) {
+            est.textContent = "✔ " + files.length + (files.length === 1 ? " archivo" : " archivos");
+            est.className = "estado ok";
+        } else if (d.req) {
+            faltan++;
+            est.textContent = "Pendiente";
+            est.className = "estado falta";
+        } else {
+            est.textContent = "Opcional";
+            est.className = "estado";
+        }
+    });
+    caja.querySelector(".exp-resumen").textContent = faltan ? `Faltan ${faltan} documentos obligatorios` : "Documentos obligatorios completos ✔";
 }
 
 // ------------------------------------------
@@ -495,6 +753,23 @@ function sincronizar(e) {
 $("formulario").addEventListener("input", sincronizar);
 $("formulario").addEventListener("change", sincronizar);
 
+// Lista de estados: al elegir "Otro" aparece un cuadro para escribir
+$("formulario").addEventListener("change", (e) => {
+    const k = e.target.dataset && e.target.dataset.lst;
+    if (!k) return;
+    const inp = el[k];
+    const otro = e.target.value === "__otro";
+    inp.hidden = !otro;
+    if (otro) {
+        E.t[k] = inp.value;
+        inp.focus();
+    } else {
+        E.t[k] = e.target.value;
+        inp.value = "";
+    }
+    pintar();
+});
+
 // Botones de opción: al tocar "Otro" aparece un cuadro para escribir; tocar otra vez quita la selección
 function elegir(k, v) {
     const g = grp[k];
@@ -512,7 +787,10 @@ function elegir(k, v) {
         inp.value = "";
     }
     g.classList.remove("error");
-    if (k === "empresaApl") guardar("dch_sol_empresa", E.t[k]);
+    if (k === "empresaApl") {
+        guardar("dch_sol_empresa", E.t[k]);
+        actualizarExpediente();
+    }
     pintar();
 }
 
@@ -582,6 +860,10 @@ $("btnLimpiar").addEventListener("click", () => {
         el[k].value = "";
         el[k].classList.remove("error");
     });
+    Object.keys(lst).forEach((k) => {
+        lst[k].value = "";
+        el[k].hidden = true;
+    });
     Object.keys(grp).forEach((k) => {
         grp[k].dataset.val = "";
         grp[k].classList.remove("error");
@@ -597,7 +879,9 @@ $("btnLimpiar").addEventListener("click", () => {
     marcarSug();
     poner("fecha", hoyISO());
     poner("entrevistador", entrev);
+    Object.keys(DOCS).forEach((k) => delete DOCS[k]);
     if (empresa) elegir("empresaApl", empresa);
+    actualizarExpediente();
     pintarPad();
     avisar("");
     irAPagina(1);
@@ -627,7 +911,7 @@ function validar() {
     return true;
 }
 
-function nombreBase() {
+function nombreBase(prefijo = "solicitud") {
     const base = (E.t.nombre || "")
         .trim()
         .toLowerCase()
@@ -638,7 +922,7 @@ function nombreBase() {
     const emp = (E.t.empresaApl || "")
         .toLowerCase()
         .replace(/[^a-z0-9]/g, "");
-    return `solicitud-${base || "candidato"}${emp ? "-" + emp : ""}`;
+    return `${prefijo}-${base || "candidato"}${emp ? "-" + emp : ""}`;
 }
 
 function aBlob(canvas, tipo, calidad) {
@@ -703,6 +987,113 @@ async function crearPDF() {
     return new Blob(partes, { type: "application/pdf" });
 }
 
+// Convierte una foto a JPEG ligero (respeta la rotación de la cámara)
+async function fotoAJpeg(file) {
+    let bmp;
+    try {
+        bmp = await createImageBitmap(file);
+    } catch (e) {
+        throw Object.assign(new Error("lectura"), { mensaje: `No se pudo leer "${file.name}". Sube la imagen en JPG o PNG, o un PDF.` });
+    }
+    const esc = Math.min(1, 2400 / Math.max(bmp.width, bmp.height));
+    const w = Math.round(bmp.width * esc);
+    const h = Math.round(bmp.height * esc);
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    const x = c.getContext("2d");
+    x.fillStyle = "#fff";
+    x.fillRect(0, 0, w, h);
+    x.drawImage(bmp, 0, 0, w, h);
+    const bytes = new Uint8Array(await (await aBlob(c, "image/jpeg", 0.88)).arrayBuffer());
+    c.width = c.height = 0;
+    return { bytes, w, h };
+}
+
+// PDF del expediente: documentos en el orden del cliente + solicitud; lo obligatorio que falte lleva marca de agua
+async function crearPDFExpediente() {
+    const { PDFDocument, StandardFonts, rgb, degrees } = PDFLib;
+    const pdf = await PDFDocument.create();
+    const negrita = await pdf.embedFont(StandardFonts.HelveticaBold);
+    const normal = await pdf.embedFont(StandardFonts.Helvetica);
+    const faltan = [];
+    const PW = 612;
+    const PH = 792;
+
+    const paginaPendiente = (titulo) => {
+        const p = pdf.addPage([PW, PH]);
+        const t = titulo.toUpperCase();
+        const tam = Math.min(24, (PW - 80) / negrita.widthOfTextAtSize(t, 1));
+        p.drawText(t, { x: (PW - negrita.widthOfTextAtSize(t, tam)) / 2, y: PH - 80, size: tam, font: negrita, color: rgb(0.1, 0.2, 0.4) });
+        const sub = "Documento no entregado";
+        p.drawText(sub, { x: (PW - normal.widthOfTextAtSize(sub, 14)) / 2, y: PH - 104, size: 14, font: normal, color: rgb(0.45, 0.45, 0.45) });
+        // marca de agua en diagonal
+        const m = "PENDIENTE DE ENTREGA";
+        const ms = 58;
+        const mw = negrita.widthOfTextAtSize(m, ms);
+        const a = Math.PI / 4;
+        p.drawText(m, {
+            x: PW / 2 - (mw / 2) * Math.cos(a) + (ms * 0.35) * Math.sin(a),
+            y: PH / 2 - (mw / 2) * Math.sin(a) - (ms * 0.35) * Math.cos(a),
+            size: ms,
+            font: negrita,
+            color: rgb(0.85, 0.19, 0.15),
+            opacity: 0.45,
+            rotate: degrees(45),
+        });
+    };
+
+    for (const d of EXPEDIENTE_MELI) {
+        if (d.k === "SOLICITUD") {
+            for (const n of [1, 2]) {
+                const img = await pdf.embedJpg(new Uint8Array(await (await renderPagina(n, "image/jpeg", 0.94)).arrayBuffer()));
+                pdf.addPage([PW, PH]).drawImage(img, { x: 0, y: 0, width: PW, height: PH });
+            }
+            continue;
+        }
+        const files = DOCS[d.k] || [];
+        if (!files.length) {
+            if (d.req) {
+                faltan.push(d.label);
+                paginaPendiente(d.label);
+            }
+            continue;
+        }
+        for (const f of files) {
+            if (f.type === "application/pdf" || /\.pdf$/i.test(f.name)) {
+                try {
+                    const src = await PDFDocument.load(await f.arrayBuffer(), { ignoreEncryption: true });
+                    // cada página del PDF se acomoda en una hoja carta
+                    const incrustadas = await pdf.embedPdf(src, src.getPageIndices());
+                    for (const ep of incrustadas) {
+                        const M = 20;
+                        const k = Math.min((PW - 2 * M) / ep.width, (PH - 2 * M) / ep.height);
+                        pdf.addPage([PW, PH]).drawPage(ep, { x: (PW - ep.width * k) / 2, y: (PH - ep.height * k) / 2, width: ep.width * k, height: ep.height * k });
+                    }
+                } catch (e) {
+                    throw Object.assign(new Error("pdf"), { mensaje: `No se pudo leer el PDF "${f.name}".` });
+                }
+            } else {
+                const { bytes, w, h } = await fotoAJpeg(f);
+                const img = await pdf.embedJpg(bytes);
+                const M = 28;
+                const s = Math.min((PW - 2 * M) / w, (PH - 2 * M) / h);
+                pdf.addPage([PW, PH]).drawImage(img, { x: (PW - w * s) / 2, y: (PH - h * s) / 2, width: w * s, height: h * s });
+            }
+        }
+    }
+    return { blob: new Blob([await pdf.save()], { type: "application/pdf" }), faltan };
+}
+
+// Según la empresa: PDF normal (solicitud) o expediente completo (MELI)
+async function generarPDF() {
+    if (esMeli()) {
+        const r = await crearPDFExpediente();
+        return { ...r, nombre: nombreBase("expediente") + ".pdf" };
+    }
+    return { blob: await crearPDF(), faltan: [], nombre: nombreBase() + ".pdf" };
+}
+
 function bajar(blob, nombre) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -731,7 +1122,7 @@ async function ocupado(boton, texto, tarea) {
         recordarUsados();
     } catch (e) {
         console.error(e);
-        avisar("No se pudo generar la solicitud. Intenta de nuevo.");
+        avisar(e.mensaje || "No se pudo generar la solicitud. Intenta de nuevo.");
     } finally {
         botones.forEach((b) => (b.disabled = false));
     }
@@ -739,8 +1130,9 @@ async function ocupado(boton, texto, tarea) {
 
 $("btnPDF").addEventListener("click", () =>
     ocupado($("btnPDF"), "Generando PDF…", async () => {
-        bajar(await crearPDF(), nombreBase() + ".pdf");
-        avisar("PDF descargado ✔");
+        const r = await generarPDF();
+        bajar(r.blob, r.nombre);
+        avisar(r.faltan.length ? `PDF descargado ✔ · Pendientes de entrega: ${r.faltan.join(", ")}` : "PDF descargado ✔");
     })
 );
 
@@ -759,7 +1151,8 @@ if (navigator.canShare && navigator.share) {
     $("btnCompartir").hidden = false;
     $("btnCompartir").addEventListener("click", () =>
         ocupado($("btnCompartir"), "Preparando…", async () => {
-            const pdf = new File([await crearPDF()], nombreBase() + ".pdf", { type: "application/pdf" });
+            const r = await generarPDF();
+            const pdf = new File([r.blob], r.nombre, { type: "application/pdf" });
             let archivos = [pdf];
             if (!navigator.canShare({ files: archivos })) {
                 archivos = [];
